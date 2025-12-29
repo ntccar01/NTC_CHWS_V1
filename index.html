@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式頭燈配線模擬器 - Stage 13.6: 含操作說明版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* --- 基礎樣式 --- */
+        body { 
+            font-family: "Microsoft JhengHei", Arial, sans-serif; 
+            background-color: #f0f4f8; 
+            margin: 0; padding: 20px; 
+            user-select: none; 
+            display: block; 
+            min-width: 1600px; 
+            overflow-x: auto; 
+        }
+        
+        .container-center { margin-left: auto; margin-right: auto; width: fit-content; }
+        h2 { color: #333; margin-top: 0; padding-bottom: 5px; text-align: center; }
+        
+        /* --- 操作說明區塊 (新功能) --- */
+        #instruction-manual {
+            width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid #2980b9;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #instruction-manual h3 { margin-top: 0; color: #2980b9; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .manual-section h4 { margin: 10px 0 5px 0; color: #444; background: #eef2f5; padding: 5px; border-radius: 4px; }
+        .manual-section ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #555; }
+        .manual-section li strong { color: #c0392b; }
+
+        /* --- 模式切換器 --- */
+        #mode-switch {
+            display: flex; gap: 0; margin-bottom: 15px; border-radius: 8px; overflow: hidden; border: 1px solid #ccc;
+            width: fit-content; margin-left: auto; margin-right: auto;
+        }
+        .mode-btn {
+            padding: 10px 30px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; transition: all 0.2s;
+            background: #eee; color: #555;
+        }
+        .mode-btn.active { color: white; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
+        #btn-mode-practice.active { background-color: #27ae60; }
+        #btn-mode-exam.active { background-color: #c0392b; }
+
+        /* --- 考評資訊列 --- */
+        #assessment-bar {
+            width: 1200px; background: #fff; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 10px; display: flex; align-items: center; gap: 10px; box-sizing: border-box;
+        }
+        .input-group { display: flex; align-items: center; gap: 5px; }
+        .input-group label { font-weight: bold; font-size: 14px; color: #555; }
+        .input-group input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px; }
+        .input-group input.long { width: 100px; }
+        
+        #gas-url { width: 100px; font-size: 10px; border: 1px dashed #ccc; padding: 5px; transition: width 0.3s; }
+        #gas-url:focus { width: 250px; border-style: solid; border-color: #2980b9; }
+
+        .btn-action { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; margin-left: 5px; white-space: nowrap; }
+        .btn-start-exam { background-color: #e67e22; font-size: 16px; padding: 5px 20px; display: none; }
+        .btn-csv { background-color: #27ae60; } .btn-csv:hover { background-color: #219150; }
+        .btn-cloud { background-color: #2980b9; } .btn-cloud:hover { background-color: #1f618d; }
+        .btn-help { background-color: #8e44ad; } .btn-help:hover { background-color: #732d91; }
+        
+        /* --- 工作區與答題區 --- */
+        #main-container { display: flex; gap: 20px; align-items: flex-start; justify-content: center; }
+
+        #workbench {
+            position: relative; width: 1200px; height: 910px; background-color: #fff;
+            border: 3px solid #444; box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 8px;
+            background-image: radial-gradient(#ddd 1px, transparent 1px); background-size: 20px 20px;
+            overflow: hidden; cursor: crosshair; flex-shrink: 0;
+        }
+
+        /* --- 答題卷面板 --- */
+        #exam-sheet {
+            width: 320px; background: #fff; border: 2px solid #c0392b; border-radius: 8px;
+            padding: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: none;
+            max-height: 910px; overflow-y: auto; flex-shrink: 0;
+        }
+        #exam-sheet h3 { margin-top: 0; color: #c0392b; border-bottom: 2px solid #eee; padding-bottom: 10px; text-align: center; }
+        .exam-item { margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .exam-item label { font-weight: bold; display: block; margin-bottom: 5px; cursor: pointer; }
+        .exam-item input[type="text"] { width: 95%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
+        #btn-submit-exam { width: 100%; padding: 12px; background-color: #c0392b; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        #btn-submit-exam:hover { background-color: #a93226; }
+        #exam-result { margin-top: 15px; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; display: none; }
+        .score-pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .score-fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* --- 元件樣式 --- */
+        #wire-layer, #meter-wire-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #wire-layer { z-index: 8; } #meter-wire-layer { z-index: 98; }
+        .wire { fill: none; stroke-width: 4; cursor: pointer; pointer-events: stroke; stroke-linecap: round; stroke-linejoin: round; transition: stroke-width 0.1s; }
+        .wire-red { stroke: #d32f2f; } .wire-black { stroke: #222; } .wire-yellow { stroke: #fbc02d; } .wire-green { stroke: #388e3c; } .wire-blue { stroke: #1976d2; } .wire-white { stroke: #ddd; stroke-dasharray: 0; filter: drop-shadow(0 0 1px #000); }
+        .wire:hover { stroke-width: 6; filter: drop-shadow(0 0 4px rgba(0,0,0,0.5)); stroke: #ff9800 !important; }
+        .preview-line { stroke: #999; stroke-width: 2; stroke-dasharray: 5,5; fill: none; pointer-events: none; }
+        .meter-lead { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .lead-red { stroke: #e74c3c; opacity: 0.9; } .lead-black { stroke: #333; opacity: 0.9; }
+        
+        .component { position: absolute; background: #e8e8e8; border: 2px solid #333; border-radius: 5px; padding: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); text-align: center; font-weight: bold; cursor: default; z-index: 5; transition: background 0.3s; }
+        .component-sm { padding: 5px; background: transparent; border: none; box-shadow: none; }
+        .fuse-element { width: 100%; height: 6px; background: #aaa; margin-top: 10px; border-radius: 3px; transition: all 0.2s; position: relative; }
+        .component.blown { background-color: #555; color: #fff; border-color: #000; animation: shake 0.5s; }
+        .component.blown .fuse-element { background: transparent; border-bottom: 2px dashed #000; }
+        .component.blown::after { content: "已燒毀"; position: absolute; top: -20px; left: 50%; transform: translateX(-50%); background: red; color: white; font-size: 10px; padding: 2px 5px; border-radius: 3px; white-space: nowrap; pointer-events: none; }
+        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
+        
+        .terminal { width: 12px; height: 12px; background-color: #666; border: 2px solid #fff; border-radius: 50%; position: absolute; cursor: pointer; z-index: 20; margin-left: -6px; margin-top: -6px; transform: none; transition: background-color 0.1s, box-shadow 0.1s, border-color 0.1s; }
+        .terminal:hover { background-color: #ff0000; box-shadow: 0 0 5px yellow; } .terminal.active { background-color: #00ff00; box-shadow: 0 0 8px #00ff00; }
+        .terminal.probe-hit-red { background-color: #fff; border: 2px solid #ff0000; box-shadow: 0 0 0 4px rgba(255, 50, 50, 0.5), 0 0 15px rgba(255, 0, 0, 0.8); z-index: 102; }
+        .terminal.probe-hit-black { background-color: #fff; border: 2px solid #333; box-shadow: 0 0 0 4px rgba(50, 50, 50, 0.5), 0 0 15px rgba(0, 0, 0, 0.8); z-index: 102; }
+        .t-top { top: 0; left: 50%; } .t-bottom { bottom: 0; left: 50%; } .t-left { top: 50%; left: 0; } .t-right { top: 50%; right: 0; }
+        .t-top:hover, .t-top.active, .t-bottom:hover, .t-bottom.active, .t-left:hover, .t-left.active, .t-right:hover, .t-right.active { transform: scale(1.3); }
+        .term-pos { top: 20px; right: 20px; background-color: #cc0000; } .term-neg { top: 20px; left: 20px; background-color: #000; }
+        .label { font-size: 12px; color: #666; display: block; }
+        .ground-icon { font-size: 32px; font-weight: 900; color: #333; line-height: 1; }
+        
+        #battery { top: 70px; left: 350px; width: 120px; height: 100px; background: #dcdcdc; } #battery::after { content: "電瓶 12V"; display: block; margin-top: 30px; }
+        #ground-batt { top: 100px; left: 280px; width: 40px; height: 40px; }
+        #fusible-link { top: 90px; left: 550px; width: 140px; height: 60px; cursor: pointer; } #fuse-box { top: 90px; left: 770px; width: 80px; height: 60px; cursor: pointer; }
+        #light-left-low { top: 300px; left: 20px; width: 80px; height: 80px; border-radius: 50%; } #ground-ll { top: 430px; left: 29px; width: 30px; height: 30px; } 
+        #light-left-high { top: 500px; left: 20px; width: 80px; height: 80px; border-radius: 50%; } #ground-lh { top: 630px; left: 29px; width: 30px; height: 30px; }
+        #light-left-small { top: 680px; left: 30px; width: 60px; height: 60px; border-radius: 50%; } #ground-ls { top: 780px; left: 33px; width: 30px; height: 30px; }
+        #light-right-low { top: 300px; right: 20px; width: 80px; height: 80px; border-radius: 50%; } #ground-rl { top: 430px; right: 29px; width: 30px; height: 30px; } 
+        #light-right-high { top: 500px; right: 20px; width: 80px; height: 80px; border-radius: 50%; } #ground-rh { top: 630px; right: 29px; width: 30px; height: 30px; }
+        #light-right-small { top: 680px; right: 30px; width: 60px; height: 60px; border-radius: 50%; } #ground-rs { top: 780px; right: 33px; width: 30px; height: 30px; }
+        #dash-indicator { top: 240px; left: 550px; width: 60px; height: 60px; border-radius: 50%; background-color: #e0f7fa; border: 2px dashed #0288d1; } #ground-ind { top: 340px; left: 583px; width: 30px; height: 30px; } 
+        
+        #switch-unit { top: 400px; left: 340px; width: 520px; height: 350px; background-color: #fff; display: flex; flex-direction: row; z-index: 6; }
+        .switch-ctrl { width: 160px; border-right: 1px solid #ccc; padding: 5px; display: flex; flex-direction: column; align-items: center; position: relative; flex-shrink: 0; overflow: visible; }
+        .ctrl-title { transform: translateY(-6px); font-size: 18px; }
+        .knob-container { position: relative; width: 80px; height: 80px; margin-top: 40px; }
+        .knob-label { position: absolute; font-size: 14px; font-weight: bold; color: #333; }
+        .lbl-off { top: 22px; left: -35px; text-align: right; } .lbl-1st { top: -20px; left: 50%; transform: translateX(-50%); text-align: center; } .lbl-2nd { top: 22px; right: -35px; text-align: left; }
+        #switch-knob { width: 60px; height: 60px; border-radius: 50%; background: #eee; border: 3px solid #333; position: absolute; top: 10px; left: 10px; cursor: pointer; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2; }
+        #switch-knob::after { content: ''; position: absolute; top: 5px; left: 27px; width: 6px; height: 25px; background-color: #d32f2f; border-radius: 3px; }
+        .slide-container { margin-top: 15px; width: 120px; text-align: center; position: relative; z-index: 10; }
+        .slide-labels { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; padding: 0 10px; }
+        .slide-track { position: relative; width: 100%; height: 30px; background-color: #ddd; border-radius: 4px; border: 2px solid #999; cursor: pointer; }
+        .slide-thumb { position: absolute; top: 2px; width: 36px; height: 22px; background-color: #444; border-radius: 2px; transition: left 0.2s ease; box-shadow: 1px 1px 3px rgba(0,0,0,0.3); }
+        .click-zone { position: absolute; top: 0; height: 100%; width: 33.33%; z-index: 15; cursor: pointer; }
+        .timer-container { width: 130px; margin-top: 15px; text-align: center; }
+        .timer-label { font-size: 11px; color: #555; display: flex; justify-content: space-between; margin-bottom: 2px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .pin-container { position: relative; width: 100%; height: 60px; margin-top: auto; margin-bottom: 10px; }
+        .pin-label { position: absolute; bottom: 20px; font-size: 10px; transform: translateX(-50%); }
+        .p-5 { left: 10px; } .p-6 { left: 40px; } .p-7 { left: 70px; } .p-8 { left: 100px; } .p-9 { left: 130px; }
+        .switch-table { flex-grow: 1; padding: 5px; font-size: 10px; overflow-x: auto; display: flex; flex-direction: column; }
+        table { width: 100%; border-collapse: collapse; text-align: center; height: auto; flex-grow: 1; }
+        th, td { border: 1px solid #000; padding: 2px; min-width: 18px; position: relative; transition: background-color 0.2s; } 
+        .filament { width: 40px; height: 20px; border-top: 3px solid #999; border-radius: 50% 50% 0 0; margin: 20px auto 0; transition: all 0.2s; }
+        .circle { border: 1px solid #000; border-radius: 50%; width: 8px; height: 8px; display: inline-block; background: #fff; position: relative; z-index: 2; transition: all 0.2s; }
+        .link-line { position: absolute; background-color: blue; width: 2px; left: 50%; transform: translateX(-50%); top: 50%; z-index: 1; }
+        .h-1 { height: 100%; } .h-2 { height: 200%; }
+        .table-title { font-size: 18px; display: inline-block; transform: translateY(-2px); }
+        .instruction-box { margin-top: 10px; text-align: left; font-size: 12px; color: #333; line-height: 1.6; padding: 5px; border-top: 1px dashed #ccc; }
+        .circle.highlight { background-color: #ff3333; border-color: #ff0000; box-shadow: 0 0 8px #ff0000; transform: scale(1.4); }
+        .bulb-on .filament { border-top-color: #fff !important; box-shadow: 0 0 30px 10px #ffeb3b; background-color: rgba(255, 235, 59, 0.5); }
+        .bulb-on-high .filament { border-top-color: #fff !important; box-shadow: 0 0 50px 20px #ffeb3b; background-color: rgba(255, 235, 59, 0.9); transform: scale(1.1); }
+        .ind-on .filament { border-color: #00ffff !important; box-shadow: 0 0 20px 5px #00bfff; background-color: rgba(0, 191, 255, 0.5); }
+        
+        #toolbar { position: absolute; top: 20px; left: 20px; z-index: 100; display: flex; gap: 10px; align-items: center; }
+        #clear-btn { padding: 8px 15px; background-color: #e74c3c; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
+        #clear-btn:hover { background-color: #c0392b; }
+        .color-palette { display: flex; background: #fff; padding: 5px; border-radius: 5px; border: 1px solid #999; gap: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .color-btn { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
+        .color-btn:hover { transform: scale(1.2); }
+        .color-btn.active { border-color: #333; box-shadow: 0 0 0 2px #fff inset; transform: scale(1.1); }
+        .c-red { background: #d32f2f; } .c-black { background: #222; } .c-yellow { background: #fbc02d; } .c-green { background: #388e3c; } .c-blue { background: #1976d2; } .c-white { background: #fff; border: 1px solid #ccc; }
+
+        #teacher-btn { position: absolute; top: 20px; right: 20px; padding: 8px 15px; background-color: #34495e; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); z-index: 110; }
+        #teacher-btn:hover { background-color: #2c3e50; }
+        #teacher-panel { position: absolute; top: 60px; right: 20px; width: 220px; background: rgba(255, 255, 255, 0.95); border: 2px solid #e74c3c; border-radius: 8px; padding: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 110; display: none; }
+        #teacher-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #c0392b; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        .fault-item { margin-bottom: 8px; font-size: 14px; display: flex; align-items: center; justify-content: space-between; }
+        .fault-item label { cursor: pointer; flex-grow: 1; }
+        .fault-item input { margin-right: 8px; cursor: pointer; }
+
+        #multimeter { position: absolute; top: 100px; left: 50px; width: 90px; height: 140px; background: #ffb300; border-radius: 8px; border: 3px solid #333; box-shadow: 3px 3px 10px rgba(0,0,0,0.4); z-index: 95; display: flex; flex-direction: column; align-items: center; padding: 8px; cursor: move; }
+        #multimeter-screen { width: 100%; height: 30px; background: #9cad90; border: 2px solid #222; border-radius: 3px; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-end; padding-right: 5px; font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #222; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2); pointer-events: none; }
+        #multimeter-dial { width: 50px; height: 50px; border-radius: 50%; background: #444; border: 2px solid #777; position: relative; margin-bottom: 10px; cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #multimeter-dial::after { content: ''; position: absolute; top: 5px; left: 22px; width: 6px; height: 20px; background: #eee; border-radius: 1px; }
+        .meter-label { color: #000; font-size: 12px; margin-bottom: 3px; pointer-events: none; font-weight: bold; }
+        .probe { position: absolute; width: 6px; height: 50px; border-radius: 2px; cursor: grab; z-index: 100; box-shadow: 1px 1px 3px rgba(0,0,0,0.3); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-origin: 50% 5px; }
+        .probe::after { content: ''; position: absolute; bottom: -40px; left: 1px; width: 4px; height: 40px; background: linear-gradient(90deg, #ccc, #fff, #999); border-radius: 0 0 1px 1px; }
+        .probe:active { cursor: grabbing; }
+        #probe-red { background: #d32f2f; top: 150px; left: 120px; } #probe-black { background: #222; top: 150px; left: 100px; }
+        .spark { position: absolute; width: 40px; height: 40px; pointer-events: none; z-index: 200; background: radial-gradient(circle, #fff, #ff0, transparent); border-radius: 50%; opacity: 0; }
+        .spark.active { animation: sparkAnim 0.3s linear; }
+        @keyframes sparkAnim { 0% { opacity: 1; transform: scale(0.1); } 50% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0; transform: scale(2); } }
+
+        /* GAS 教學 Modal */
+        #help-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; }
+        #help-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 700px; max-height: 80vh; overflow-y: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        #help-content h2 { margin-top: 0; color: #2980b9; }
+        #help-content pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .close-help { float: right; cursor: pointer; font-size: 20px; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div id="mode-switch">
+        <button id="btn-mode-practice" class="mode-btn active" onclick="setMode('practice')">練習模式</button>
+        <button id="btn-mode-exam" class="mode-btn" onclick="setMode('exam')">考評模式</button>
+    </div>
+
+    <div id="assessment-bar" class="container-center">
+        <div class="input-group">
+            <label>班級:</label> <input type="text" id="stu-class" placeholder="801">
+        </div>
+        <div class="input-group">
+            <label>座號:</label> <input type="text" id="stu-seat" placeholder="01">
+        </div>
+        <div class="input-group">
+            <label>姓名:</label> <input type="text" id="stu-name" placeholder="王小明" class="long">
+        </div>
+        
+        <button class="btn-action btn-start-exam" onclick="startExam()">⚡ 開始考評</button>
+        
+        <div style="flex-grow:1"></div>
+        
+        <div class="input-group">
+            <label style="font-size:10px;">GAS URL:</label>
+            <input type="text" id="gas-url" placeholder="Apps Script URL">
+        </div>
+        <button class="btn-action btn-cloud" onclick="uploadToGAS()">☁️ 上傳雲端</button>
+        <button class="btn-action btn-csv" onclick="downloadCSV()">📥 下載 CSV</button>
+        <button class="btn-action btn-help" onclick="showGASHelp()">❓ 設定說明</button>
+    </div>
+
+    <div id="main-container">
+        <div id="workbench">
+            <div id="toolbar">
+                <button id="clear-btn" onclick="clearAllWires()">全部拆除</button>
+                <div class="color-palette">
+                    <div class="color-btn c-red active" onclick="selectColor('red', this)"></div>
+                    <div class="color-btn c-black" onclick="selectColor('black', this)"></div>
+                    <div class="color-btn c-yellow" onclick="selectColor('yellow', this)"></div>
+                    <div class="color-btn c-green" onclick="selectColor('green', this)"></div>
+                    <div class="color-btn c-blue" onclick="selectColor('blue', this)"></div>
+                    <div class="color-btn c-white" onclick="selectColor('white', this)"></div>
+                </div>
+            </div>
+
+            <button id="teacher-btn" onclick="toggleTeacherPanel()">🛠️ 故障設定</button>
+            <div id="teacher-panel">
+                <h3>練習模式 - 手動設定</h3>
+                <div class="fault-item"><label><input type="checkbox" onchange="toggleFault('light-left-low')"> 左-近光燈 斷路</label></div>
+                <div class="fault-item"><label><input type="checkbox" onchange="toggleFault('light-right-low')"> 右-近光燈 斷路</label></div>
+                <div class="fault-item"><label><input type="checkbox" onchange="toggleFault('light-left-high')"> 左-遠光燈 斷路</label></div>
+                <div class="fault-item"><label><input type="checkbox" onchange="toggleFault('light-right-high')"> 右-遠光燈 斷路</label></div>
+                <div class="fault-item"><label><input type="checkbox" onchange="toggleFault('gnd-batt')"> 電瓶搭鐵不良</label></div>
+            </div>
+
+            <svg id="wire-layer"></svg>
+            <svg id="meter-wire-layer"></svg>
+            <div id="spark-effect" class="spark"></div>
+            
+            <div id="battery" class="component">
+                <div class="terminal term-neg" title="負極" data-id="batt-neg" data-type="ground"></div>
+                <div class="terminal term-pos" title="正極" data-id="batt-pos"></div>
+                <span style="position:absolute; top:10px; right:45px; font-weight:900; color:red;">+</span>
+                <span style="position:absolute; top:10px; left:45px; font-weight:900;">-</span>
+            </div>
+            <div id="ground-batt" class="component component-sm"><div class="terminal t-top" title="搭鐵" data-id="gnd-batt" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            
+            <div id="fusible-link" class="component" onclick="repairFuse('main')"><span class="label">易熔絲</span><div class="fuse-element" id="fuse-vis-main"></div><div class="terminal t-left" title="輸入" data-id="fuse-main-in"></div><div class="terminal t-right" title="輸出" data-id="fuse-main-out"></div><div style="font-size:10px;">MAIN</div></div>
+            <div id="fuse-box" class="component" onclick="repairFuse('light')"><span class="label">頭燈保險絲</span><div class="terminal t-left" data-id="fuse-light-in"></div><div class="terminal t-right" data-id="fuse-light-out"></div><div class="fuse-element" id="fuse-vis-light"></div></div>
+            
+            <div id="light-left-low" class="component bulb-unit"><span class="label">左-近光</span><div class="filament"></div><div class="terminal t-bottom" style="left: 30%" data-id="ll-low-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="ll-low-2"></div></div>
+            <div id="ground-ll" class="component component-sm"><div class="terminal t-top" data-id="gnd-ll" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            <div id="light-left-high" class="component bulb-unit"><span class="label">左-遠光</span><div class="filament"></div><div class="terminal t-bottom" style="left: 30%" data-id="ll-high-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="ll-high-2"></div></div>
+            <div id="ground-lh" class="component component-sm"><div class="terminal t-top" data-id="gnd-lh" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            <div id="light-left-small" class="component bulb-unit"><span class="label">左-小燈</span><div class="filament" style="width:25px; margin-top:10px;"></div><div class="terminal t-bottom" style="left: 30%" data-id="ll-small-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="ll-small-2"></div></div>
+            <div id="ground-ls" class="component component-sm"><div class="terminal t-top" data-id="gnd-ls" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+
+            <div id="light-right-low" class="component bulb-unit"><span class="label">右-近光</span><div class="filament"></div><div class="terminal t-bottom" style="left: 30%" data-id="lr-low-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="lr-low-2"></div></div>
+            <div id="ground-rl" class="component component-sm"><div class="terminal t-top" data-id="gnd-rl" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            <div id="light-right-high" class="component bulb-unit"><span class="label">右-遠光</span><div class="filament"></div><div class="terminal t-bottom" style="left: 30%" data-id="lr-high-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="lr-high-2"></div></div>
+            <div id="ground-rh" class="component component-sm"><div class="terminal t-top" data-id="gnd-rh" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            <div id="light-right-small" class="component bulb-unit"><span class="label">右-小燈</span><div class="filament" style="width:25px; margin-top:10px;"></div><div class="terminal t-bottom" style="left: 30%" data-id="lr-small-1"></div><div class="terminal t-bottom" style="left: 70%" data-id="lr-small-2"></div></div>
+            <div id="ground-rs" class="component component-sm"><div class="terminal t-top" data-id="gnd-rs" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            
+            <div id="dash-indicator" class="component bulb-unit-ind"><span class="label">遠光指示</span><div class="filament" style="width:20px; border-color:blue;"></div><div class="terminal t-bottom" style="left: 20%" data-id="ind-1"></div><div class="terminal t-bottom" style="left: 80%" data-id="ind-2"></div></div>
+            <div id="ground-ind" class="component component-sm"><div class="terminal t-top" title="搭鐵" data-id="gnd-ind" data-type="ground"></div><div class="ground-icon">⏚</div></div>
+            
+            <div id="switch-unit" class="component" style="cursor: default;">
+                <div class="switch-ctrl">
+                    <div class="ctrl-title">開關控制</div>
+                    <div class="knob-container"><span class="knob-label lbl-off">OFF</span><span class="knob-label lbl-1st">1ST</span><span class="knob-label lbl-2nd">2ND</span><div id="switch-knob" onclick="rotateSwitch()"></div></div>
+                    <div class="slide-container"><div class="slide-labels"><span>A</span><span>B</span><span>C</span></div><div class="slide-track"><div id="slide-thumb" class="slide-thumb" style="left: 40px;"></div><div class="click-zone" style="left: 0;" onclick="setSubSwitch(0)" title="A"></div><div class="click-zone" style="left: 33.33%;" onclick="setSubSwitch(1)" title="B"></div><div class="click-zone" style="left: 66.66%;" onclick="setSubSwitch(2)" title="C"></div></div></div>
+                    <div class="timer-container"><div class="timer-label"><span>復歸:</span><span id="timer-val">1s</span></div><input type="range" id="flash-timer" min="1" max="10" value="1" step="1" oninput="document.getElementById('timer-val').innerText = this.value + 's'"></div>
+                    <div class="pin-container"><div class="terminal t-bottom p-5" title="Pin 5" data-id="sw-5"></div><span class="pin-label p-5">5</span><div class="terminal t-bottom p-6" title="Pin 6" data-id="sw-6"></div><span class="pin-label p-6">6</span><div class="terminal t-bottom p-7" title="Pin 7" data-id="sw-7"></div><span class="pin-label p-7">7</span><div class="terminal t-bottom p-8" title="Pin 8" data-id="sw-8"></div><span class="pin-label p-8">8</span><div class="terminal t-bottom p-9" title="Pin 9" data-id="sw-9"></div><span class="pin-label p-9">9</span></div>
+                </div>
+                <div class="switch-table">
+                    <strong class="table-title">頭燈開關對照表</strong>
+                    <table><tr><th rowspan="2">段位</th><th colspan="3">OFF</th><th colspan="3">1ST (近)</th><th colspan="3">2ND (遠)</th></tr><tr><td>A</td><td>B</td><td>C</td><td>A</td><td>B</td><td>C</td><td>A</td><td>B</td><td>C</td></tr><tr><td>5</td><td></td><td></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td></td><td></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-2"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td></tr><tr><td>6</td><td></td><td></td><td><span class="circle"></span></td><td></td><td></td><td><span class="circle"></span></td><td><span class="circle"></span></td><td></td><td><span class="circle"></span></td></tr><tr><td>7</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><span class="circle"></span></td><td></td></tr><tr><td>8</td><td></td><td></td><td></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td><td><span class="circle"></span><div class="link-line h-1"></div></td></tr><tr><td>9</td><td></td><td></td><td></td><td><span class="circle"></span></td><td><span class="circle"></span></td><td><span class="circle"></span></td><td><span class="circle"></span></td><td><span class="circle"></span></td><td><span class="circle"></span></td></tr></table>
+                    <div class="instruction-box"><div><strong>旋鈕：</strong>負責開啟小燈、大燈 (OFF / 1ST(小燈) / 2ND(大燈))。</div><div><strong>撥桿：</strong>負責切換遠近光燈或超車燈 (A(遠光) / B(近光) / C(超車燈))。</div></div>
+                </div>
+            </div>
+
+            <div id="multimeter">
+                <div id="multimeter-screen">0.00 V</div>
+                <div id="meter-mode-label" class="meter-label">DCV</div>
+                <div id="multimeter-dial" onclick="toggleMeterMode()"></div>
+            </div>
+            
+            <div id="probe-red" class="probe" data-angle="0"></div>
+            <div id="probe-black" class="probe" data-angle="0"></div>
+        </div>
+
+        <div id="exam-sheet">
+            <h3>📝 考評答題卷</h3>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="light-left-low"> 左-近光燈 故障</label>
+                <input type="text" id="reason-light-left-low" placeholder="請輸入判斷依據 (例如: 測得電阻 O.L)">
+            </div>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="light-right-low"> 右-近光燈 故障</label>
+                <input type="text" id="reason-light-right-low" placeholder="請輸入判斷依據">
+            </div>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="light-left-high"> 左-遠光燈 故障</label>
+                <input type="text" id="reason-light-left-high" placeholder="請輸入判斷依據">
+            </div>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="light-right-high"> 右-遠光燈 故障</label>
+                <input type="text" id="reason-light-right-high" placeholder="請輸入判斷依據">
+            </div>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="gnd-batt"> 電瓶搭鐵不良</label>
+                <input type="text" id="reason-gnd-batt" placeholder="請輸入判斷依據">
+            </div>
+            <div class="exam-item">
+                <label><input type="checkbox" name="exam-fault" value="none"> 系統正常 (無故障)</label>
+                <input type="text" id="reason-none" placeholder="判斷依據">
+            </div>
+            <button id="btn-submit-exam" onclick="submitExam()">交卷評分</button>
+            <div id="exam-result"></div>
+        </div>
+    </div>
+
+    <div id="instruction-manual">
+        <h3>📖 操作說明</h3>
+        <div class="manual-grid">
+            <div class="manual-section">
+                <h4>🔌 配線操作</h4>
+                <ul>
+                    <li><strong>連線：</strong>點擊一個端點 (Terminal) 作為起點，移動滑鼠至目標端點再次點擊完成連線。</li>
+                    <li><strong>選色：</strong>左上角可選擇線路顏色 (紅/黑/黃/綠/藍/白)。</li>
+                    <li><strong>拆除：</strong>點擊已連接的線路可拆除該線；按「全部拆除」清空所有線路。</li>
+                </ul>
+                <h4>⚡ 三用電表</h4>
+                <ul>
+                    <li><strong>移動：</strong>按住電表本體可拖曳位置。</li>
+                    <li><strong>換檔：</strong>點擊中央旋鈕切換模式：<strong>DCV(電壓)</strong> / <strong>Ω(電阻)</strong> / <strong>🔊(蜂鳴)</strong>。</li>
+                    <li><strong>探棒：</strong>按住探棒可拖曳測量；<strong>雙擊探棒</strong>可旋轉角度 (紅順時針/黑逆時針)。</li>
+                </ul>
+            </div>
+            <div class="manual-section">
+                <h4>💡 元件操作</h4>
+                <ul>
+                    <li><strong>開關：</strong>點擊旋鈕切換 OFF/1ST/2ND；點擊滑桿切換 A/B/C 位置。</li>
+                    <li><strong>保險絲：</strong>點擊燒毀的保險絲可進行更換 (僅限練習模式)。</li>
+                </ul>
+                <h4>📝 考評模式</h4>
+                <ul>
+                    <li>點擊上方「考評模式」按鈕進入。</li>
+                    <li>輸入班級座號後，按「⚡ 開始考評」隨機產生故障。</li>
+                    <li>使用電表查修後，在右側答題卷勾選故障點並填寫理由，最後按「交卷評分」。</li>
+                    <li><strong>上傳：</strong>完成後可點擊「☁️ 上傳雲端」將結果與截圖傳送給老師。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="help-modal">
+        <div id="help-content">
+            <span class="close-help" onclick="document.getElementById('help-modal').style.display='none'">&times;</span>
+            <h2>Google Apps Script (GAS) 設定教學</h2>
+            <p>請依照以下步驟建立雲端接收端：</p>
+            <ol>
+                <li>建立一個新的 Google 試算表 (Google Sheets)。</li>
+                <li>點選上方選單 <strong>擴充功能 (Extensions)</strong> > <strong>Apps Script</strong>。</li>
+                <li>刪除原本的程式碼，複製並貼上以下程式碼：</li>
+            </ol>
+            <pre>
+function doPost(e) {
+  try {
+    // ★ 請在此填入您的 Google Drive 資料夾 ID
+    var folderId = "您的資料夾ID_請貼在雙引號內"; 
+    
+    var jsonString = e.postData.contents;
+    var data = JSON.parse(jsonString);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    
+    // 處理截圖存檔
+    var fileUrl = "無截圖";
+    if (data.image && data.image.length > 100) {
+      try {
+        var imageFolder = DriveApp.getFolderById(folderId);
+        
+        // ★ 自動偵測並移除標頭
+        var base64Data = data.image;
+        if (base64Data.indexOf('base64,') > -1) {
+          base64Data = base64Data.split('base64,')[1];
+        }
+        
+        var imageBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/png', data.filename + ".png");
+        var file = imageFolder.createFile(imageBlob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        fileUrl = file.getUrl();
+      } catch(imgErr) {
+        fileUrl = "存檔失敗: " + imgErr.toString();
+      }
+    }
+    
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["時間", "班級", "座號", "姓名", "接線數量", "保險絲狀態", "模式", "故障/結果", "截圖連結"]);
+    }
+    
+    sheet.appendRow([
+      new Date(),
+      data.class,
+      data.seat,
+      data.name,
+      data.wiresCount,
+      data.fuseState,
+      data.mode,
+      data.faultsDetected,
+      fileUrl
+    ]);
+    
+    return ContentService.createTextOutput("Success");
+  } catch(err) {
+    return ContentService.createTextOutput("GAS Error: " + err.toString());
+  }
+}</pre>
+            <ol start="4">
+                <li>點擊右上角 <strong>部署 (Deploy)</strong> > <strong>管理部署 (Manage deployments)</strong>。</li>
+                <li>點擊鉛筆圖示編輯，版本選擇 <strong>建立新版本 (New version)</strong>。</li>
+                <li>設定：誰可以存取 (Who has access): <strong>任何人 (Anyone)</strong>。</li>
+                <li>點擊部署，複製網址貼回模擬器的「GAS URL」欄位。</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        let beepOscillator = null;
+
+        let wires = []; let isDrawing = false; let startTerminal = null; let points = []; let tempPolyline = null; 
+        let switchState = 0; let knobDirection = 1; let subSwitchState = 1; let passingTimer = null; 
+        let fuseState = { main: true, light: true };
+        let currentWireColor = 'red';
+        let meterMode = 0; 
+        let faults = {}; 
+        
+        let currentMode = 'practice'; // 'practice' or 'exam'
+        let activeExamFault = null; 
+
+        window.onload = function() {
+            const savedUrl = localStorage.getItem('gas_url');
+            if (savedUrl) document.getElementById('gas-url').value = savedUrl;
+            resetProbes();
+        }
+
+        // --- 考評與雲端功能 ---
+        function showGASHelp() { document.getElementById('help-modal').style.display = 'block'; }
+
+        function downloadCSV() {
+            const cls = document.getElementById('stu-class').value || "未知班級";
+            const seat = document.getElementById('stu-seat').value || "00";
+            const name = document.getElementById('stu-name').value || "未知名";
+            
+            const fuseStatus = `Main:${fuseState.main ? 'OK' : 'Blown'}, Light:${fuseState.light ? 'OK' : 'Blown'}`;
+            let faultInfo = "";
+            let modeStr = "";
+            
+            if (currentMode === 'exam') {
+                modeStr = "考評模式";
+                const checkboxes = document.querySelectorAll('input[name="exam-fault"]:checked');
+                let studentAns = (checkboxes.length > 0) ? checkboxes[0].value : "未作答";
+                let reason = document.getElementById('reason-' + studentAns)?.value || "";
+                faultInfo = `題目[${activeExamFault || '未開始'}], 學生回答[${studentAns}], 理由[${reason}]`;
+            } else {
+                modeStr = "練習模式";
+                faultInfo = "設定故障: " + (Object.keys(faults).join(';') || "無");
+            }
+            
+            const wireCount = wires.length;
+            const time = new Date().toLocaleString();
+
+            const csvContent = "\uFEFF" + 
+                "時間,班級,座號,姓名,接線數,保險絲狀態,模式,詳細資訊\n" +
+                `${time},${cls},${seat},${name},${wireCount},"${fuseStatus}",${modeStr},"${faultInfo}"`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${cls}_${seat}_${name}_Result.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function uploadToGAS() {
+            const url = document.getElementById('gas-url').value.trim();
+            if (!url) { alert("請先輸入 GAS Web App URL！"); return; }
+            localStorage.setItem('gas_url', url);
+
+            const cls = document.getElementById('stu-class').value || "Class";
+            const seat = document.getElementById('stu-seat').value || "00";
+            const name = document.getElementById('stu-name').value || "Name";
+            
+            const btn = document.querySelector('.btn-cloud');
+            const originalText = btn.innerText;
+            btn.innerText = "截圖中..."; btn.disabled = true;
+
+            html2canvas(document.querySelector("#workbench")).then(canvas => {
+                const imgData = canvas.toDataURL("image/png");
+                
+                let faultInfo = "";
+                let modeStr = "";
+                
+                if (currentMode === 'exam') {
+                    modeStr = "考評模式";
+                    const checkboxes = document.querySelectorAll('input[name="exam-fault"]:checked');
+                    let studentAns = (checkboxes.length > 0) ? checkboxes[0].value : "未作答";
+                    let isCorrect = (studentAns === activeExamFault) ? "答對" : "答錯";
+                    faultInfo = `結果: ${isCorrect} (題:${activeExamFault}/答:${studentAns})`;
+                } else {
+                    modeStr = "練習模式";
+                    faultInfo = Object.keys(faults).join('; ') || "無故障";
+                }
+
+                const data = {
+                    class: cls, seat: seat, name: name,
+                    filename: `${cls}_${seat}_${name}_${new Date().toISOString().slice(0,10)}`,
+                    wiresCount: wires.length,
+                    fuseState: `Main:${fuseState.main ? 'OK' : 'Blown'}, Light:${fuseState.light ? 'OK' : 'Blown'}`,
+                    mode: modeStr,
+                    faultsDetected: faultInfo,
+                    image: imgData
+                };
+
+                btn.innerText = "上傳中...";
+
+                fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                    headers: { "Content-Type": "text/plain" }
+                })
+                .then(response => response.text())
+                .then(result => {
+                    if (result.includes("Success")) {
+                        alert("✅ 上傳成功！\n資料與截圖已存入雲端。");
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    } else {
+                        alert("❌ 上傳失敗！Google 回傳錯誤：\n" + result);
+                        console.error("GAS Error:", result);
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
+                })
+                .catch(error => { 
+                    console.error('Fetch Error:', error); 
+                    alert("❌ 連線失敗 (Fetch Error)\n請檢查網址是否正確，或網路是否通暢。"); 
+                    btn.innerText = originalText; 
+                    btn.disabled = false; 
+                });
+            });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-mode-practice').classList.remove('active');
+            document.getElementById('btn-mode-exam').classList.remove('active');
+            document.getElementById('btn-mode-' + mode).classList.add('active');
+
+            const teacherBtn = document.getElementById('teacher-btn');
+            const examBtn = document.querySelector('.btn-start-exam');
+            const examSheet = document.getElementById('exam-sheet');
+            
+            if (mode === 'practice') {
+                teacherBtn.style.display = 'block';
+                examBtn.style.display = 'none';
+                examSheet.style.display = 'none';
+                clearAllWires(); 
+                faults = {}; 
+                updateCircuit();
+            } else {
+                teacherBtn.style.display = 'none';
+                document.getElementById('teacher-panel').style.display = 'none'; 
+                examBtn.style.display = 'block';
+                examSheet.style.display = 'block';
+                clearAllWires(); 
+                faults = {}; 
+                activeExamFault = null;
+                document.getElementById('exam-result').style.display = 'none';
+                resetExamSheet();
+                updateCircuit();
+                alert("已進入考評模式。請輸入班級座號後，點擊「⚡ 開始考評」系統將隨機產生一個故障。");
+            }
+        }
+
+        function startExam() {
+            if (currentMode !== 'exam') return;
+            clearAllWires(); 
+            faults = {}; 
+            resetExamSheet();
+            document.getElementById('exam-result').style.display = 'none';
+
+            const possibleFaults = [
+                'light-left-low', 'light-right-low', 
+                'light-left-high', 'light-right-high', 
+                'gnd-batt', 'none'
+            ];
+            const randomIndex = Math.floor(Math.random() * possibleFaults.length);
+            activeExamFault = possibleFaults[randomIndex];
+
+            if (activeExamFault !== 'none') {
+                faults[activeExamFault] = true;
+            }
+
+            updateCircuit();
+            alert("考評開始！系統已設定隨機故障（也可能無故障）。\n請配線並使用電表查修，在右側答題卷勾選結果。");
+        }
+
+        function submitExam() {
+            if (!activeExamFault && activeExamFault !== 'none') {
+                alert("請先點擊「開始考評」！");
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('input[name="exam-fault"]:checked');
+            if (checkboxes.length === 0) {
+                alert("請至少勾選一個故障原因！");
+                return;
+            }
+            
+            let studentAnswer = checkboxes[0].value; 
+            if (checkboxes.length > 1) {
+                alert("本測驗為單一故障，請只勾選一個最可能的故障點。");
+                return;
+            }
+
+            const resultDiv = document.getElementById('exam-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = '';
+
+            let isCorrect = (studentAnswer === activeExamFault);
+            
+            if (isCorrect) {
+                resultDiv.innerHTML = "🎉 恭喜答對！<br>故障點：" + getFaultName(activeExamFault);
+                resultDiv.classList.add('score-pass');
+            } else {
+                resultDiv.innerHTML = "❌ 答錯了！<br>正確答案是：" + getFaultName(activeExamFault);
+                resultDiv.classList.add('score-fail');
+            }
+        }
+
+        function getFaultName(id) {
+            const map = {
+                'light-left-low': '左-近光燈 斷路',
+                'light-right-low': '右-近光燈 斷路',
+                'light-left-high': '左-遠光燈 斷路',
+                'light-right-high': '右-遠光燈 斷路',
+                'gnd-batt': '電瓶搭鐵不良',
+                'none': '系統正常'
+            };
+            return map[id] || id;
+        }
+
+        function resetExamSheet() {
+            document.querySelectorAll('input[name="exam-fault"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('#exam-sheet input[type="text"]').forEach(txt => txt.value = "");
+        }
+
+        function toggleTeacherPanel() {
+            const p = document.getElementById('teacher-panel');
+            p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+        }
+
+        function toggleFault(id) {
+            if (faults[id]) delete faults[id];
+            else faults[id] = true;
+            updateCircuit();
+        }
+
+        function selectColor(color, btn) {
+            currentWireColor = color;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        const svgLayer = document.getElementById('wire-layer'); const workbench = document.getElementById('workbench'); const terminals = document.querySelectorAll('.terminal');
+        const meterWireLayer = document.getElementById('meter-wire-layer');
+        const meter = document.getElementById('multimeter');
+        const meterScreen = document.getElementById('multimeter-screen');
+        const meterLabel = document.getElementById('meter-mode-label');
+        const meterDial = document.getElementById('multimeter-dial');
+        const probeRed = document.getElementById('probe-red');
+        const probeBlack = document.getElementById('probe-black');
+        let activeProbe = null; let probeRedTarget = null; let probeBlackTarget = null; 
+        let meterPathRed = null; let meterPathBlack = null;
+
+        meterPathRed = createMeterWire('lead-red');
+        meterPathBlack = createMeterWire('lead-black');
+        
+        function toggleMeterMode() {
+            meterMode = (meterMode + 1) % 3;
+            let rot = 0;
+            if (meterMode === 0) rot = 0; if (meterMode === 1) rot = 30; if (meterMode === 2) rot = 60; 
+            meterDial.style.transform = `rotate(${rot}deg)`;
+            if (meterMode === 0) meterLabel.innerText = "DCV"; else if (meterMode === 1) meterLabel.innerText = "Ω (OHM)"; else meterLabel.innerText = "🔊 (BEEP)";
+            updateCircuit();
+        }
+
+        function playBeep(enable) {
+            if (enable) {
+                if (!beepOscillator) {
+                    beepOscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    beepOscillator.type = 'square'; beepOscillator.frequency.setValueAtTime(2000, audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    beepOscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+                    beepOscillator.start();
+                }
+            } else {
+                if (beepOscillator) { beepOscillator.stop(); beepOscillator = null; }
+            }
+        }
+
+        function resetProbes() {
+            const mRect = meter.getBoundingClientRect(); const wbRect = workbench.getBoundingClientRect();
+            probeRed.style.left = (mRect.right + 10 - wbRect.left) + 'px'; probeRed.style.top = (mRect.bottom - 60 - wbRect.top) + 'px';
+            probeBlack.style.left = (mRect.left - 20 - wbRect.left) + 'px'; probeBlack.style.top = (mRect.bottom - 60 - wbRect.top) + 'px';
+            updateMeterWires();
+        }
+
+        let isMeterDragging = false; let meterOffsetX, meterOffsetY;
+        meter.addEventListener('mousedown', (e) => { if (e.target === meterDial) return; isMeterDragging = true; const mRect = meter.getBoundingClientRect(); meterOffsetX = e.clientX - mRect.left; meterOffsetY = e.clientY - mRect.top; meter.style.cursor = 'grabbing'; e.stopPropagation(); });
+        document.addEventListener('mousemove', (e) => {
+            const wbRect = workbench.getBoundingClientRect();
+            if (isMeterDragging) { let x = e.clientX - wbRect.left - meterOffsetX; let y = e.clientY - wbRect.top - meterOffsetY; x = Math.max(0, Math.min(x, 1200 - 90)); y = Math.max(0, Math.min(y, 910 - 140)); meter.style.left = x + 'px'; meter.style.top = y + 'px'; updateMeterWires(); }
+            if (activeProbe) { let x = e.clientX - wbRect.left; let y = e.clientY - wbRect.top; x = Math.max(0, Math.min(x, 1200)); y = Math.max(0, Math.min(y, 910)); activeProbe.style.left = (x - 3) + 'px'; activeProbe.style.top = (y - 15) + 'px'; updateMeterWires(); }
+        });
+        document.addEventListener('mouseup', (e) => { if (isMeterDragging) { isMeterDragging = false; meter.style.cursor = 'move'; } if (activeProbe) { const color = activeProbe.id === 'probe-red' ? 'red' : 'black'; checkSnap(activeProbe, color); activeProbe.style.cursor = 'grab'; activeProbe = null; updateCircuit(); } });
+
+        setupProbeInteractions(probeRed, 'red'); setupProbeInteractions(probeBlack, 'black');
+        function createMeterWire(cls) { const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('class', `meter-lead ${cls}`); meterWireLayer.appendChild(path); return path; }
+        function setupProbeInteractions(probe, color) {
+            probe.addEventListener('mousedown', (e) => { activeProbe = probe; probe.style.cursor = 'grabbing'; e.stopPropagation(); });
+            probe.addEventListener('dblclick', (e) => {
+                let angle = parseInt(probe.getAttribute('data-angle')) || 0; if (color === 'red') angle = (angle + 30) % 360; else angle = (angle - 30) % 360;
+                probe.setAttribute('data-angle', angle); probe.style.transform = `rotate(${angle}deg)`;
+                let currentTargetId = (color === 'red') ? probeRedTarget : probeBlackTarget;
+                if (currentTargetId) {
+                    let targetEl = null; terminals.forEach(term => { if (term.dataset.id === currentTargetId) targetEl = term; });
+                    if (targetEl) {
+                        const wbRect = workbench.getBoundingClientRect(); const tRect = targetEl.getBoundingClientRect();
+                        const targetX = tRect.left + tRect.width/2 - wbRect.left; const targetY = tRect.top + tRect.height/2 - wbRect.top;
+                        const rad = angle * (Math.PI / 180); const length = 85; 
+                        const newOriginX = targetX + length * Math.sin(rad); const newOriginY = targetY - length * Math.cos(rad);
+                        probe.style.left = (newOriginX - 3) + 'px'; probe.style.top = (newOriginY - 5) + 'px';
+                        updateMeterWires(); return;
+                    }
+                }
+                setTimeout(() => { checkSnap(probe, color); updateCircuit(); }, 200); e.stopPropagation();
+            });
+        }
+        function updateMeterWires() {
+            const wbRect = workbench.getBoundingClientRect(); const meterRect = meter.getBoundingClientRect();
+            const startX = meterRect.left + meterRect.width/2 - wbRect.left; const startY = meterRect.bottom - 20 - wbRect.top; 
+            const rRect = probeRed.getBoundingClientRect(); const rLeft = parseFloat(probeRed.style.left) || 0; const rTop = parseFloat(probeRed.style.top) || 0;
+            meterPathRed.setAttribute('d', `M${startX + 10},${startY} Q${startX + 30},${rTop + 50} ${rLeft + 3},${rTop + 5}`);
+            const bLeft = parseFloat(probeBlack.style.left) || 0; const bTop = parseFloat(probeBlack.style.top) || 0;
+            meterPathBlack.setAttribute('d', `M${startX - 10},${startY} Q${startX - 30},${bTop + 50} ${bLeft + 3},${bTop + 5}`);
+        }
+        function checkSnap(probe, color) {
+            document.querySelectorAll('.terminal').forEach(t => { if (color === 'red') t.classList.remove('probe-hit-red'); else t.classList.remove('probe-hit-black'); });
+            const angle = parseInt(probe.getAttribute('data-angle')) || 0; const rad = angle * (Math.PI / 180);
+            const originX = (parseFloat(probe.style.left) || 0) + 3; const originY = (parseFloat(probe.style.top) || 0) + 5; const length = 85; 
+            const tipX = originX - length * Math.sin(rad); const tipY = originY + length * Math.cos(rad);
+            let closest = null; let minDist = 20; const wbRect = workbench.getBoundingClientRect();
+            terminals.forEach(term => {
+                const tRect = term.getBoundingClientRect(); const tX = tRect.left + tRect.width/2 - wbRect.left; const tY = tRect.top + tRect.height/2 - wbRect.top;
+                const dist = Math.hypot(tipX - tX, tipY - tY); if (dist < minDist) { minDist = dist; closest = term; }
+            });
+            if (closest) {
+                const tRect = closest.getBoundingClientRect();
+                const targetX = tRect.left + tRect.width/2 - wbRect.left; const targetY = tRect.top + tRect.height/2 - wbRect.top;
+                const newOriginX = targetX + length * Math.sin(rad); const newOriginY = targetY - length * Math.cos(rad);
+                probe.style.left = (newOriginX - 3) + 'px'; probe.style.top = (newOriginY - 5) + 'px';
+                if (color === 'red') { probeRedTarget = closest.dataset.id; closest.classList.add('probe-hit-red'); } else { probeBlackTarget = closest.dataset.id; closest.classList.add('probe-hit-black'); }
+            } else { if (color === 'red') probeRedTarget = null; else probeBlackTarget = null; }
+            updateMeterWires();
+        }
+
+        terminals.forEach(term => { term.addEventListener('click', (e) => { e.stopPropagation(); handleTerminalClick(term); }); });
+        workbench.addEventListener('click', (e) => { if (isDrawing) addPointToPolyline(e); });
+        workbench.addEventListener('mousemove', (e) => { if (isDrawing) updatePreview(e); });
+        workbench.addEventListener('contextmenu', (e) => { e.preventDefault(); if(isDrawing) cancelDrawing(); });
+        document.addEventListener('keydown', (e) => { if (e.key === "Escape" && isDrawing) cancelDrawing(); });
+        function clearAllWires() { 
+            if (wires.length === 0) return; 
+            if (confirm('警告：確定要拆除所有連線嗎？此動作無法復原。')) { 
+                wires.forEach(w => svgLayer.removeChild(w.element)); wires = []; 
+                fuseState = {main:true, light:true}; 
+                if (currentMode === 'practice') faults = {}; 
+                updateFuseUI(); updateCircuit(); 
+            } 
+        }
+        function handleTerminalClick(term) { if (!isDrawing) startDrawing(term); else { if (term === startTerminal) return; finishDrawing(term); } }
+        function startDrawing(term) { isDrawing = true; startTerminal = term; term.classList.add('active'); const pos = getCenterPos(term); points = [`${pos.x},${pos.y}`]; tempPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); let colorClass = `wire-${currentWireColor}`; if (currentWireColor === 'red' && (term.dataset.type === 'ground' || term.dataset.id === 'batt-neg')) tempPolyline.setAttribute('class', 'preview-line wire-black'); else tempPolyline.setAttribute('class', `preview-line ${colorClass}`); tempPolyline.setAttribute('points', points.join(' ')); svgLayer.appendChild(tempPolyline); }
+        function addPointToPolyline(e) { const snapPos = getSnappedPos(e); points.push(`${snapPos.x},${snapPos.y}`); }
+        function updatePreview(e) { if (!tempPolyline) return; const snapPos = getSnappedPos(e); const currentPath = [...points, `${snapPos.x},${snapPos.y}`].join(' '); tempPolyline.setAttribute('points', currentPath); }
+        function finishDrawing(endTerminal) { const exists = wires.some(w => (w.startId === startTerminal.dataset.id && w.endId === endTerminal.dataset.id) || (w.startId === endTerminal.dataset.id && w.endId === startTerminal.dataset.id)); if (exists) { alert("這條線已經接過了！"); cancelDrawing(); return; } const endPos = getCenterPos(endTerminal); points.push(`${endPos.x},${endPos.y}`); let finalColor = currentWireColor; if (currentWireColor === 'red') { if (startTerminal.dataset.type === 'ground' || startTerminal.dataset.id === 'batt-neg' || endTerminal.dataset.type === 'ground' || endTerminal.dataset.id === 'batt-neg') finalColor = 'black'; } createPermanentWire(startTerminal, endTerminal, points, finalColor); cancelDrawing(); }
+        function cancelDrawing() { if (startTerminal) startTerminal.classList.remove('active'); if (tempPolyline) { svgLayer.removeChild(tempPolyline); tempPolyline = null; } isDrawing = false; startTerminal = null; points = []; }
+        function createPermanentWire(t1, t2, pathPoints, color) { const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); polyline.setAttribute('class', `wire wire-${color}`); polyline.setAttribute('points', pathPoints.join(' ')); polyline.addEventListener('click', function(e) { e.stopPropagation(); if(confirm('拆除此線？')) removeWire(this); }); svgLayer.appendChild(polyline); wires.push({ startId: t1.dataset.id, endId: t2.dataset.id, element: polyline }); updateCircuit(); }
+        function removeWire(el) { svgLayer.removeChild(el); wires = wires.filter(w => w.element !== el); updateCircuit(); }
+        function getCenterPos(el) { const r = el.getBoundingClientRect(); const wb = workbench.getBoundingClientRect(); return { x: r.left + r.width/2 - (wb.left + workbench.clientLeft), y: r.top + r.height/2 - (wb.top + workbench.clientTop) }; }
+        function getSnappedPos(e) { const wb = workbench.getBoundingClientRect(); let cX = e.clientX - (wb.left + workbench.clientLeft); let cY = e.clientY - (wb.top + workbench.clientTop); if (points.length > 0) { const [lX, lY] = points[points.length - 1].split(',').map(Number); const dX = cX - lX, dY = cY - lY, th = 0.052; if (Math.abs(dY) < Math.abs(dX) * th) cY = lY; else if (Math.abs(dX) < Math.abs(dY) * th) cX = lX; } return { x: cX, y: cY }; }
+        function rotateSwitch() { const knob = document.getElementById('switch-knob'); switchState += knobDirection; if (switchState >= 2) { switchState = 2; knobDirection = -1; } else if (switchState <= 0) { switchState = 0; knobDirection = 1; } let angle = -90; if (switchState === 0) angle = -90; if (switchState === 1) angle = 0; if (switchState === 2) angle = 90; knob.style.transform = `rotate(${angle}deg)`; updateTableHighlight(); updateCircuit(); }
+        function setSubSwitch(state) { if (passingTimer) { clearTimeout(passingTimer); passingTimer = null; } subSwitchState = state; updateUI(); if (state === 2) { const delay = document.getElementById('flash-timer').value * 1000; passingTimer = setTimeout(() => { setSubSwitch(1); }, delay); } }
+        function updateUI() { const thumb = document.getElementById('slide-thumb'); let leftPos = '40px'; if (subSwitchState === 0) leftPos = '2px'; if (subSwitchState === 1) leftPos = '40px'; if (subSwitchState === 2) leftPos = '78px'; thumb.style.left = leftPos; updateTableHighlight(); updateCircuit(); }
+        function updateTableHighlight() { document.querySelectorAll('.switch-table .circle').forEach(c => c.classList.remove('highlight')); const colIndex = (switchState * 3) + subSwitchState; const table = document.querySelector('.switch-table table'); const rows = table.querySelectorAll('tr'); for (let i = 2; i < rows.length; i++) { const cells = rows[i].querySelectorAll('td'); const targetCell = cells[colIndex + 1]; if (targetCell) { const circle = targetCell.querySelector('.circle'); if (circle) circle.classList.add('highlight'); } } }
+        function repairFuse(type) { if (!fuseState[type]) { if (confirm('是否更換燒毀的保險絲？')) { fuseState[type] = true; updateFuseUI(); updateCircuit(); } } }
+        function updateFuseUI() { const mainFuse = document.getElementById('fusible-link'); const lightFuse = document.getElementById('fuse-box'); if (!fuseState.main) mainFuse.classList.add('blown'); else mainFuse.classList.remove('blown'); if (!fuseState.light) lightFuse.classList.add('blown'); else lightFuse.classList.remove('blown'); }
+        function triggerSpark() { const spark = document.getElementById('spark-effect'); const fuseRect = document.getElementById('fusible-link').getBoundingClientRect(); const wbRect = document.getElementById('workbench').getBoundingClientRect(); spark.style.left = (fuseRect.left - wbRect.left + 50) + 'px'; spark.style.top = (fuseRect.top - wbRect.top) + 'px'; spark.classList.remove('active'); void spark.offsetWidth; spark.classList.add('active'); }
+
+        function updateCircuit() {
+            const graph = {}; const nodes = document.querySelectorAll('.terminal'); nodes.forEach(n => graph[n.dataset.id] = []);
+            function connect(id1, id2) { if (graph[id1] && graph[id2]) { if (!graph[id1].includes(id2)) graph[id1].push(id2); if (!graph[id2].includes(id1)) graph[id2].push(id1); } }
+            wires.forEach(w => connect(w.startId, w.endId));
+            if (fuseState.main) connect('fuse-main-in', 'fuse-main-out'); if (fuseState.light) connect('fuse-light-in', 'fuse-light-out');
+            if (switchState === 0) { if (subSwitchState === 2) connect('sw-5', 'sw-6'); } 
+            else if (switchState === 1) { if (subSwitchState === 0 || subSwitchState === 1) connect('sw-8', 'sw-9'); if (subSwitchState === 2) { connect('sw-5', 'sw-6'); connect('sw-8', 'sw-9'); } } 
+            else if (switchState === 2) { if (subSwitchState === 0) { connect('sw-5', 'sw-6'); connect('sw-8', 'sw-9'); } if (subSwitchState === 1) { connect('sw-5', 'sw-7'); connect('sw-8', 'sw-9'); } if (subSwitchState === 2) { connect('sw-5', 'sw-6'); connect('sw-8', 'sw-9'); } }
+            
+            function isShortToGround(startNode) {
+                if (!graph[startNode]) return false; let q = [startNode]; let v = new Set([startNode]);
+                while(q.length > 0) {
+                    let curr = q.shift();
+                    const el = document.querySelector(`.terminal[data-id="${curr}"]`);
+                    if (curr === 'batt-neg' || (el && el.dataset.type === 'ground')) return true;
+                    if (graph[curr]) { graph[curr].forEach(next => { if (!v.has(next)) { v.add(next); q.push(next); } }); }
+                } return false;
+            }
+            if (fuseState.light && fuseState.main) { if (isShortToGround('fuse-light-out')) { fuseState.light = false; triggerSpark(); updateFuseUI(); updateCircuit(); return; } }
+            if (fuseState.main) { if (isShortToGround('fuse-main-out')) { fuseState.main = false; triggerSpark(); updateFuseUI(); updateCircuit(); return; } }
+
+            const hasPower = new Set(); const powerQueue = ['batt-pos']; hasPower.add('batt-pos');
+            while(powerQueue.length > 0) { const current = powerQueue.shift(); if (graph[current]) { graph[current].forEach(neighbor => { if (!hasPower.has(neighbor)) { hasPower.add(neighbor); powerQueue.push(neighbor); } }); } }
+            const hasGround = new Set(); const groundQueue = [];
+            let isGroundFault = faults['gnd-batt'];
+            nodes.forEach(n => { 
+                if (n.dataset.id === 'batt-neg') { groundQueue.push(n.dataset.id); hasGround.add(n.dataset.id); }
+                else if (n.dataset.type === 'ground' && !isGroundFault) { groundQueue.push(n.dataset.id); hasGround.add(n.dataset.id); }
+            });
+            while(groundQueue.length > 0) { const current = groundQueue.shift(); if (graph[current]) { graph[current].forEach(neighbor => { if (!hasGround.has(neighbor)) { hasGround.add(neighbor); groundQueue.push(neighbor); } }); } }
+            const bulbs = [
+                { id: 'light-left-low', t1: 'll-low-1', t2: 'll-low-2', type: 'head-low' }, { id: 'light-left-high', t1: 'll-high-1', t2: 'll-high-2', type: 'head-high' },
+                { id: 'light-right-low', t1: 'lr-low-1', t2: 'lr-low-2', type: 'head-low' }, { id: 'light-right-high', t1: 'lr-high-1', t2: 'lr-high-2', type: 'head-high' },
+                { id: 'dash-indicator', t1: 'ind-1', t2: 'ind-2', type: 'ind' },
+                { id: 'light-left-small', t1: 'll-small-1', t2: 'll-small-2', type: 'head-low' }, { id: 'light-right-small', t1: 'lr-small-1', t2: 'lr-small-2', type: 'head-low' }
+            ];
+            bulbs.forEach(b => {
+                let isBroken = faults[b.id];
+                if (isBroken) {
+                    document.getElementById(b.id).classList.remove('bulb-on', 'bulb-on-high', 'ind-on');
+                } else {
+                    const t1Power = hasPower.has(b.t1); const t1Ground = hasGround.has(b.t1); const t2Power = hasPower.has(b.t2); const t2Ground = hasGround.has(b.t2);
+                    const isOn = (t1Power && t2Ground) || (t1Ground && t2Power);
+                    const el = document.getElementById(b.id); el.classList.remove('bulb-on', 'bulb-on-high', 'ind-on');
+                    if (isOn) { if (b.type === 'head-low') el.classList.add('bulb-on'); else if (b.type === 'head-high') el.classList.add('bulb-on-high'); else if (b.type === 'ind') el.classList.add('ind-on'); }
+                }
+            });
+
+            playBeep(false);
+            let displayVal = "0.00";
+            if (probeRedTarget && probeBlackTarget) {
+                const isLive = hasPower.has(probeRedTarget) || hasPower.has(probeBlackTarget); 
+                if (meterMode === 0) { 
+                    let vRed = 0; let vBlack = 0;
+                    if (hasPower.has(probeRedTarget)) vRed = 12.60;
+                    if (hasPower.has(probeBlackTarget)) vBlack = 12.60;
+                    let val = vRed - vBlack;
+                    displayVal = val.toFixed(2) + " V";
+                } 
+                else if (meterMode === 1 || meterMode === 2) { 
+                    if (isLive) {
+                        displayVal = "Err"; 
+                    } else {
+                        if (probeRedTarget === probeBlackTarget) {
+                            displayVal = "0.1 Ω";
+                            if (meterMode === 2) playBeep(true);
+                        } else {
+                            let queue = [{n: probeRedTarget, r: 0}];
+                            let seen = new Map(); seen.set(probeRedTarget, 0);
+                            let found = false; let finalRes = 0;
+                            while(queue.length > 0) {
+                                queue.sort((a,b)=>a.r-b.r);
+                                let {n, r} = queue.shift();
+                                if (n === probeBlackTarget) { found = true; finalRes = r; break; }
+                                let neighbors = [];
+                                if (graph[n]) graph[n].forEach(nxt => neighbors.push({id: nxt, v: 0.1}));
+                                bulbs.forEach(b => {
+                                    if (!faults[b.id]) {
+                                        if (n === b.t1) neighbors.push({id: b.t2, v: 3.0});
+                                        if (n === b.t2) neighbors.push({id: b.t1, v: 3.0});
+                                    }
+                                });
+                                if (fuseState.main) { if (n === 'fuse-main-in') neighbors.push({id: 'fuse-main-out', v: 0.1}); if (n === 'fuse-main-out') neighbors.push({id: 'fuse-main-in', v: 0.1}); }
+                                if (fuseState.light) { if (n === 'fuse-light-in') neighbors.push({id: 'fuse-light-out', v: 0.1}); if (n === 'fuse-light-out') neighbors.push({id: 'fuse-light-in', v: 0.1}); }
+                                neighbors.forEach(nb => {
+                                    let newR = r + nb.v;
+                                    if (!seen.has(nb.id) || newR < seen.get(nb.id)) {
+                                        seen.set(nb.id, newR);
+                                        queue.push({n: nb.id, r: newR});
+                                    }
+                                });
+                            }
+                            if (found) {
+                                displayVal = finalRes.toFixed(1) + " Ω";
+                                if (meterMode === 2 && finalRes < 10) playBeep(true);
+                            } else {
+                                displayVal = "O.L";
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (meterMode === 0) displayVal = "0.00 V";
+                else displayVal = "O.L";
+            }
+            meterScreen.innerText = displayVal;
+        }
+        document.getElementById('switch-knob').style.transform = `rotate(-90deg)`;
+        updateTableHighlight();
+    </script>
+</body>
+</html>
